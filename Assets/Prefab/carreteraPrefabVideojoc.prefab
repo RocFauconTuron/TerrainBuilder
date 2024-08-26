@@ -100,7 +100,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   centerVectors: []
-  roadWidth: 10
+  roadWidth: 3
   startPos: {x: 0, y: 0, z: 0}
   endPos: {x: 0, y: 0, z: 0}
   mat: {fileID: 2100000, guid: a382a94939165944c88b72b437e0459f, type: 2}
@@ -113,6 +113,7 @@ MonoBehaviour:
   showRoad: 1
   sliderResolution: 3.6
   uvTiling: 30
+  uvTilingWidth: 1
   lineRenderer: {fileID: 4925922700438622266}
 --- !u!114 &1357330351447637225
 MonoBehaviour:

@@ -34,7 +34,6 @@ Material:
     - _NoiseScale1: {r: 1, g: -63.01, b: 0, a: 0}
     - _NoiseScale2: {r: 0.41, g: -4.08, b: 0.013, a: 0}
   m_BuildTextureStacks: []
-  m_AllowLocking: 1
 --- !u!114 &270140708419882468
 MonoBehaviour:
   m_ObjectHideFlags: 11

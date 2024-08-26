@@ -32,6 +32,12 @@ public class CameraController : MonoBehaviour
     GameManager gameManager;
     float doubleClickTimer = 0;
     Vector3 anteriorDoubleClickPos;
+
+    private Vector2 lastMousePosition;
+
+    [SerializeField] float dragPanSpeed;
+    [SerializeField] float moveSpeedDrag = 50f;
+    float timerCameraDrag = 0;
     private void Awake()
     {
         currentRot = targetRotate.localEulerAngles;
@@ -95,40 +101,30 @@ public class CameraController : MonoBehaviour
                 }
                 doubleClickTimer = 0;
             }
+            timerCameraDrag += Time.deltaTime;
             if (Input.GetMouseButton(2))
             {
-                //Vector3 mousePosition = Input.mousePosition;
-                //Ray mRay = camera.ScreenPointToRay(mousePosition);
-                //RaycastHit hit;
+                Vector3 inputDir = new Vector3(0, 0, 0);
 
-                //if (Physics.Raycast(mRay, out hit, Mathf.Infinity, layer))
-                //{
-                //    Vector3 targetPosition = new Vector3(hit.point.x, 0, hit.point.z);
-                //    //targetRotate.position = Vector3.Lerp(transform.position, targetPosition, moveSpeed * Time.deltaTime);
-                //    targetRotate.position = targetPosition;
-                //    // Optionally, stop moving when very close to the target to prevent jittering
-                //    if (Vector3.Distance(transform.position, targetPosition) < 0.1f)
-                //    {
-                //        targetRotate.position = targetPosition;
-                //    }
-                //}
+                if (timerCameraDrag > 0.1)
+                {
+                    lastMousePosition = Input.mousePosition;
+                }
 
-                posX = Input.GetAxis("Mouse X");
-                posY = Input.GetAxis("Mouse Y");
-                Vector3 forward = transform.forward;
-                Vector3 right = transform.right;
+                Vector2 mouseMovementDelta = (Vector2)Input.mousePosition - lastMousePosition;
 
-                // Normalizar los vectores forward y right para que no afecten la velocidad de movimiento
-                forward.y = 0;
-                right.y = 0;
-                forward.Normalize();
-                right.Normalize();
+                inputDir.x = mouseMovementDelta.x * dragPanSpeed;
+                inputDir.z = mouseMovementDelta.y * dragPanSpeed;
 
-                // Calcular la dirección deseada en función de la entrada del usuario
-                Vector3 desiredMoveDirection = (forward * -posY + right * -posX).normalized;
+                lastMousePosition = Input.mousePosition;
 
-                // Mover el punto de pivote en la dirección deseada
-                targetRotate.position += desiredMoveDirection * moveSpeed * Time.deltaTime;
+                Vector3 moveDir = targetRotate.forward * -inputDir.z + targetRotate.right * -inputDir.x;
+                Debug.Log(moveDir);
+
+                targetRotate.position += moveDir * moveSpeedDrag * Time.deltaTime;
+                targetRotate.position = new Vector3(targetRotate.position.x, 0, targetRotate.position.z);
+
+                timerCameraDrag = 0;
             }
 
             float scrollInput = Input.mouseScrollDelta.y;

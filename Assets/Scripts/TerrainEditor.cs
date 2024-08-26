@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.EventSystems;
 
 public class TerrainEditor : MonoBehaviour
 {
@@ -44,6 +45,8 @@ public class TerrainEditor : MonoBehaviour
 
     [SerializeField] int minHeight;
     float minHeightController;
+    [SerializeField] float strengthMutliplierSmooth;
+    bool canEditTerrain;
     // Start is called before the first frame update
     void Start()
     {
@@ -65,80 +68,74 @@ public class TerrainEditor : MonoBehaviour
     }
     void Update()
     {
-        if (gameManager._gameState == gameState.terrain)
+        if(!EventSystem.current.IsPointerOverGameObject() && Input.GetMouseButtonDown(0))
         {
-            if (Input.GetMouseButton(0) && mode == 0)
+            canEditTerrain = true;
+        }
+        else if(EventSystem.current.IsPointerOverGameObject())
+        {
+            canEditTerrain = false;
+        }
+        if (gameManager._gameState == gameState.terrain && canEditTerrain )
+        {
+            if (Input.GetKey(KeyCode.LeftAlt) || Input.GetMouseButton(2))
             {
-                scaleUp = true;
-                if (Input.GetKey(KeyCode.LeftShift))
-                {
-                    scaleUp = false;
-                }
-                if (GetInfoTerrain())
-                {
-                    ModifyTerrain();
-                }
-
+                decalPaint.gameObject.SetActive(false);
+                return;
             }
-            if (Input.GetMouseButton(0) && mode == 1)
+            if (GetInfoTerrain() && Input.GetMouseButton(0))
             {
-                if (GetInfoTerrain())
+                switch (mode)
                 {
-                    SmoothTerrain();
-                }
-            }
-            if (Input.GetMouseButton(0) && mode == 2)
-            {
-                if (GetInfoTerrain())
-                {
-                    PaintTerrain();
-                }
-            }
-            if (Input.GetMouseButton(0) && mode == 3)
-            {
-                if (GetInfoTerrain())
-                {
-                    PaintTrees();
-                }
-            }
-            if (Input.GetMouseButton(0) && mode == 4)
-            {
-                if (GetInfoTerrain())
-                {
-                    if (Input.GetKey(KeyCode.LeftShift))
-                    {
-                        PaintGrass(true);
-                    }
-                    else
-                    {
-                        PaintGrass(false);
-                    }
-                    
-                }
-            }
-            if (Input.GetMouseButton(0) && mode == 5)
-            {
-                if (GetInfoTerrain())
-                {
-                    if (Input.GetKey(KeyCode.LeftShift))
-                    {
-                        GetHeightPointForFlat();
-                    }
-                    else
-                    {
-                        FlatTerrain();
-                    }
-
+                    case 0:
+                        scaleUp = true;
+                        if (Input.GetKey(KeyCode.LeftShift))
+                        {
+                            scaleUp = false;
+                        }
+                        ModifyTerrain();
+                        break;
+                    case 1:
+                        SmoothTerrain();
+                        break;
+                    case 2:
+                        PaintTerrain();
+                        break;
+                    case 3:
+                        PaintTrees();
+                        break;
+                    case 4:
+                        if (Input.GetKey(KeyCode.LeftShift))
+                        {
+                            PaintGrass(true);
+                        }
+                        else
+                        {
+                            PaintGrass(false);
+                        }
+                        break;
+                    case 5:
+                        if (Input.GetKey(KeyCode.LeftShift))
+                        {
+                            GetHeightPointForFlat();
+                        }
+                        else
+                        {
+                            FlatTerrain();
+                        }
+                        break;
+                    default:
+                        break;
                 }
             }
-
 
             Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, layerMask))
             {
+                decalPaint.gameObject.SetActive(true);
                 if (!isDecalActive)
                 {
-                    decalPaint.gameObject.SetActive(true);
+
                     isDecalActive = true;
                 }
                 brushSize = menuTerrainInfo.GetSize();
@@ -283,7 +280,7 @@ public class TerrainEditor : MonoBehaviour
         TerrainData terrainData = terrain.terrainData;
 
         // Get the terrain coordinates where the mouse hits
-        float multiplier = terrainData.alphamapWidth / width;
+        float multiplier = terrainData.alphamapWidth / width + 1;
         int brushPaint = Mathf.RoundToInt(brushSize * multiplier);
         int sqrRadius = brushPaint * brushPaint;
 
@@ -331,26 +328,6 @@ public class TerrainEditor : MonoBehaviour
         terrainData.SetAlphamaps(startX, startZ, alphaMap);
     }
 
-    void NormalizeAlphaMap(float[,,] alphaMap)
-    {
-        for (int y = 0; y < alphaMap.GetLength(0); y++)
-        {
-            for (int x = 0; x < alphaMap.GetLength(1); x++)
-            {
-                float sum = 0f;
-                for (int t = 0; t < alphaMap.GetLength(2); t++)
-                {
-                    sum += alphaMap[y, x, t];
-                }
-
-                for (int t = 0; t < alphaMap.GetLength(2); t++)
-                {
-                    alphaMap[y, x, t] /= sum;
-                }
-            }
-        }
-    }
-
     void SmoothTerrain()
     {
         int brushWidth = Mathf.RoundToInt((brushSize / terrainWidth) * width);
@@ -396,7 +373,7 @@ public class TerrainEditor : MonoBehaviour
 
                     // Calculate the smoothed height
                     averageHeight /= count;
-                    heights[newZ, newX] = Mathf.Lerp(heights[newZ, newX], averageHeight, strength * Time.deltaTime * 6);
+                    heights[newZ, newX] = Mathf.Lerp(heights[newZ, newX], averageHeight, strength * Time.deltaTime * strengthMutliplierSmooth);
                 }
                 
             }

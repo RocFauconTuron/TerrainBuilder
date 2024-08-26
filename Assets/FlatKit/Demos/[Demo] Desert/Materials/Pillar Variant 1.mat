@@ -50,4 +50,3 @@ Material:
     - _NoiseScale1: {r: 1, g: -54.15, b: 0, a: 0}
     - _NoiseScale2: {r: 0.41, g: -0.32, b: 0.07, a: 0}
   m_BuildTextureStacks: []
-  m_AllowLocking: 1

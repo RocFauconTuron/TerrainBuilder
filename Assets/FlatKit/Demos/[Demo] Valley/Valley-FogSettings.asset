@@ -15,6 +15,7 @@ Material:
   m_ValidKeywords:
   - FOG_CAMERA_RELATIVE
   - USE_DISTANCE_FOG
+  - USE_HEIGHT_FOG
   m_InvalidKeywords: []
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
@@ -50,11 +51,11 @@ Material:
     m_Floats:
     - _DistanceFogIntensity: 0.27
     - _DistanceHeightBlend: 0.251
-    - _Far: 240.3
+    - _Far: 183.43
     - _HeightFogIntensity: 0.631
     - _HighWorldY: 169.8
     - _LowWorldY: 0
-    - _Near: 82.43
+    - _Near: 160.1
     m_Colors: []
   m_BuildTextureStacks: []
 --- !u!114 &11400000
@@ -100,10 +101,10 @@ MonoBehaviour:
     m_ColorSpace: 0
     m_NumColorKeys: 2
     m_NumAlphaKeys: 3
-  near: 82.43
-  far: 240.3
+  near: 160.1
+  far: 183.43
   distanceFogIntensity: 0.27
-  useHeight: 0
+  useHeight: 1
   heightGradient:
     serializedVersion: 2
     key0: {r: 0.0745098, g: 0.94509804, b: 0.9280485, a: 0}

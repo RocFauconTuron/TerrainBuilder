@@ -104,9 +104,9 @@ Material:
     - _FoamMode: 2
     - _FoamNoiseAmount: 0
     - _FoamProcedural: 1
-    - _FoamScale: 0.176
-    - _FoamSharpness: 0.596
-    - _FoamSpeed: 0.26
+    - _FoamScale: 0.003
+    - _FoamSharpness: 0.76
+    - _FoamSpeed: 0.005
     - _FoamStretchX: 1
     - _FoamStretchY: 2.8
     - _FoamTexture: 1

@@ -12,7 +12,7 @@ Material:
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords:
-  - DR_GRADIENT_ON
+  - DR_RIM_ON
   - _CELPRIMARYMODE_SINGLE
   - _DETAILMAPBLENDINGMODE_MULTIPLY
   - _GRADIENTSPACE_WORLD
@@ -121,7 +121,7 @@ Material:
     - _GradientAngle: 180
     - _GradientCenterX: 0
     - _GradientCenterY: 0
-    - _GradientEnabled: 1
+    - _GradientEnabled: 0
     - _GradientEnd: 0.55
     - _GradientSize: -47.8
     - _GradientSpace: 0
@@ -143,7 +143,7 @@ Material:
     - _OverrideShadowsEnabled: 1
     - _Parallax: 0.02
     - _QueueOffset: 0
-    - _RimEnabled: 0
+    - _RimEnabled: 1
     - _SecondaryColor: 1
     - _SecondaryColorEnabled: 1
     - _SelfShadingSize: 0.418
