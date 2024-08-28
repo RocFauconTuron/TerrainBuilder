@@ -25,6 +25,10 @@ public class TerrainEditor : MonoBehaviour
     int terrainZ;
     float terrainY;
     float[,] heights;
+    int startZ;
+    int endZ;
+    int startX;
+    int endX;
 
     [SerializeField] MenuTerrain menuTerrainInfo;
     int mode;
@@ -93,10 +97,12 @@ public class TerrainEditor : MonoBehaviour
                         {
                             scaleUp = false;
                         }
-                        ModifyTerrain();
+                        RaiseTerrain();
+                        AutoPaintTerrain();
                         break;
                     case 1:
                         SmoothTerrain();
+                        AutoPaintTerrain();
                         break;
                     case 2:
                         PaintTerrain();
@@ -128,6 +134,10 @@ public class TerrainEditor : MonoBehaviour
                         break;
                 }
             }
+            //if (Input.GetMouseButtonUp(0) && (mode == 0||mode == 1))
+            //{
+            //    AutoPaintTerrain();
+            //}
 
             Ray ray = _camera.ScreenPointToRay(Input.mousePosition);
             if (Physics.Raycast(ray, out RaycastHit hit, Mathf.Infinity, layerMask))
@@ -152,6 +162,111 @@ public class TerrainEditor : MonoBehaviour
             }
         }
         
+    }
+    Vector3 worldPos;
+    void AutoPaintTerrain()
+    {
+        TerrainData terrainData = terrain.terrainData;
+
+        // Obtener coordenadas del terreno donde el pincel toca
+        float multiplier = terrainData.alphamapWidth / width + 1;
+        int brushPaint = Mathf.RoundToInt(brushSize * multiplier);
+        int sqrRadiusPaint = brushPaint * brushPaint;
+
+        int terrainXPaint = (int)(((point.x - terrain.transform.position.x) / terrainWidth) * terrainData.alphamapWidth);
+        int terrainZPaint = (int)(((point.z - terrain.transform.position.z) / terrainDepth) * terrainData.alphamapHeight);
+
+        // Obtener la porción del mapa de alfa afectada por el pincel
+        int startXPaint = Mathf.Clamp(terrainXPaint - brushPaint, 0, terrainData.alphamapWidth - 1);
+        int startZPaint = Mathf.Clamp(terrainZPaint - brushPaint, 0, terrainData.alphamapHeight - 1);
+        int endXPaint = Mathf.Clamp(terrainXPaint + brushPaint, 0, terrainData.alphamapWidth - 1);
+        int endZPaint = Mathf.Clamp(terrainZPaint + brushPaint, 0, terrainData.alphamapHeight - 1);
+
+        float[,,] alphaMap = terrainData.GetAlphamaps(startXPaint, startZPaint, endXPaint - startXPaint, endZPaint - startZPaint);
+
+        int localTerrainX = terrainXPaint - startXPaint;
+        int localTerrainZ = terrainZPaint - startZPaint;
+
+        for (int i = 0; i < endZPaint - startZPaint; i++)
+        {
+            for (int j = 0; j < endXPaint - startXPaint; j++)
+            {
+                int sqrDstFromCentre = (j - localTerrainX) * (j - localTerrainX) + (i - localTerrainZ) * (i - localTerrainZ);
+
+                if (sqrDstFromCentre <= sqrRadiusPaint)
+                {
+                    // Convertir las coordenadas de alphamap a mundo
+                    float worldX = (startXPaint + j) / (float)terrainData.alphamapWidth * terrainData.size.x + terrain.transform.position.x;
+                    float worldZ = (startZPaint + i) / (float)terrainData.alphamapHeight * terrainData.size.z + terrain.transform.position.z;
+                    worldPos = new Vector3(worldX, 500f, worldZ); // Posición inicial de raycast (por encima del terreno)
+
+                    // Lanzar raycast hacia abajo para obtener la normal del terreno
+                    RaycastHit hit;
+                    if (Physics.Raycast(worldPos, Vector3.down, out hit, 1000f, layerMask))
+                    {
+                        Vector3 normal = hit.normal;
+
+                        // Vector hacia arriba (suelo)
+                        Vector3 groundNormal = Vector3.up;
+                        float dotProduct = Vector3.Dot(normal, groundNormal);
+
+                        Debug.Log($"Dot Product: {dotProduct}");
+                        Debug.Log("Pendiente mayor que 45 grados, aplicando terreno rocoso.");
+                        alphaMap[i, j, 1] = 1 / dotProduct - 1;  // Asegúrate de aplicar correctamente el valor de alpha
+
+                        //// Pintar si la pendiente es mayor a 45 grados
+                        //if (dotProduct < 0.5)  // 0.7 es el coseno de 45 grados
+                        //{
+                        //    Debug.Log("Pendiente mayor que 45 grados, aplicando terreno rocoso.");
+                        //    alphaMap[i, j, 1] = dotProduct/1-1;  // Asegúrate de aplicar correctamente el valor de alpha
+                        //}
+                        //else
+                        //{
+                        //    alphaMap[i, j, 1] = 0.0f;  // No pintar en superficies planas
+                        //}
+                    }
+                }
+            }
+        }
+        terrainData.SetAlphamaps(startXPaint, startZPaint, alphaMap);
+    }
+    private void OnDrawGizmos()
+    {
+        Gizmos.DrawRay(worldPos, Vector3.down);
+    }
+    public Vector3 GetTerrainNormal(Vector3 worldPos, Terrain terrain)
+    {
+        TerrainData terrainData = terrain.terrainData;
+
+        // Convertir las coordenadas del mundo a coordenadas del heightmap
+        int mapX = Mathf.FloorToInt((worldPos.x / terrainData.size.x) * terrainData.heightmapResolution);
+        int mapZ = Mathf.FloorToInt((worldPos.z / terrainData.size.z) * terrainData.heightmapResolution);
+
+        // Asegúrate de que las coordenadas estén dentro del rango
+        mapX = Mathf.Clamp(mapX, 1, terrainData.heightmapResolution - 2);
+        mapZ = Mathf.Clamp(mapZ, 1, terrainData.heightmapResolution - 2);
+
+        // Obtener las alturas de los puntos vecinos
+        float[,] heights = terrainData.GetHeights(mapX - 1, mapZ - 1, 3, 3);
+
+        float heightL = heights[1, 0];
+        float heightR = heights[1, 2];
+        float heightD = heights[0, 1];
+        float heightU = heights[2, 1];
+
+        // Calcular la normal
+        float terrainWidth = terrainData.size.x / (terrainData.heightmapResolution - 1);
+        float terrainHeight = terrainData.size.z / (terrainData.heightmapResolution - 1);
+
+        Vector3 normal = new Vector3(
+            (heightL - heightR) / terrainWidth,
+            2.0f,
+            (heightD - heightU) / terrainHeight
+        );
+
+        normal.Normalize();
+
+        return normal;
     }
     void PaintGrass(bool removeGrass)
     {
@@ -207,36 +322,24 @@ public class TerrainEditor : MonoBehaviour
     void FlatTerrain()
     {
         flat = menuTerrainInfo.GetFlat();
-        int brushWidth = Mathf.RoundToInt((brushSize / terrainWidth) * width);
-        int brushHeight = Mathf.RoundToInt((brushSize / terrainDepth) * height);      
 
+        int localTerrainX = terrainX - startX;
+        int localTerrainZ = terrainZ - startZ;
         int sqrRadius = brushSize * brushSize;
-        // Smooth the heights within the brush area
-        for (int x = -brushSize; x < brushSize; x++)
+
+        for (int i = 0; i < endZ - startZ; i++)
         {
-            for (int z = -brushSize; z < brushSize; z++)
+            for (int j = 0; j < endX - startX; j++)
             {
-                int sqrDstFromCentre = x * x + z * z;
-                // Check i f point is inside brush radius 
+                int sqrDstFromCentre = (j - localTerrainX) * (j - localTerrainX) + (i - localTerrainZ) * (i - localTerrainZ);
+
                 if (sqrDstFromCentre <= sqrRadius)
                 {
-                    float averageHeight = 0f;
-                    int count = 0;
-
-                    int newX = x + (int)terrainX;
-                    int newZ = z + (int)terrainZ;
-                    newX = Mathf.Clamp(newX, 0, width - 1);
-                    newZ = Mathf.Clamp(newZ, 0, height - 1);
-
-                    heights[newZ, newX] = Mathf.Lerp(heights[newZ, newX], flat, flatForce * Time.deltaTime);
+                    heights[i, j] = Mathf.Lerp(heights[i, j], flat, flatForce * Time.deltaTime);
                 }
-
             }
         }
-
-
-        //Apply the modified heights back to the terrain
-        terrain.terrainData.SetHeights(0, 0, heights);
+        terrain.terrainData.SetHeights(startX, startZ, heights);
     }
     void PaintTrees()
     {
@@ -313,12 +416,12 @@ public class TerrainEditor : MonoBehaviour
                     {
                         if (t == textureIndex)
                         {
-                            alphaMap[i, j, t] += strengthPaint;
+                            alphaMap[i, j, t] += strength * Time.deltaTime*3 ;
                         }
-                        else
-                        {
-                            alphaMap[i, j, t] *= (1 - strengthPaint);
-                        }
+                        //else
+                        //{
+                        //    alphaMap[i, j, t] *= strength * Time.deltaTime; ;
+                        //}
                     }
                 }
             }
@@ -330,58 +433,46 @@ public class TerrainEditor : MonoBehaviour
 
     void SmoothTerrain()
     {
-        int brushWidth = Mathf.RoundToInt((brushSize / terrainWidth) * width);
-        int brushHeight = Mathf.RoundToInt((brushSize / terrainDepth) * height);
-
-        // Get the area affected by the brush
-        int startX = Mathf.Clamp(terrainX - brushWidth / 2, 0, width - 1);
-        int startZ = Mathf.Clamp(terrainZ - brushHeight / 2, 0, height - 1);
-        int endX = Mathf.Clamp(terrainX + brushWidth / 2, 0, width);
-        int endZ = Mathf.Clamp(terrainZ + brushHeight / 2, 0, height);
-
-
+        int localTerrainX = terrainX - startX;
+        int localTerrainZ = terrainZ - startZ;
         int sqrRadius = brushSize * brushSize;
-        // Smooth the heights within the brush area
-        for (int x = -brushSize; x < brushSize; x++)
+
+        for (int i = 0; i < endZ - startZ; i++)
         {
-            for (int z = -brushSize; z < brushSize; z++)
+            for (int j = 0; j < endX - startX; j++)
             {
-                int sqrDstFromCentre = x * x + z * z;
-                // Check i f point is inside brush radius 
+                int sqrDstFromCentre = (j - localTerrainX) * (j - localTerrainX) + (i - localTerrainZ) * (i - localTerrainZ);
+
                 if (sqrDstFromCentre <= sqrRadius)
                 {
                     float averageHeight = 0f;
                     int count = 0;
 
-                    int newX = x + (int)terrainX;
-                    int newZ = z + (int)terrainZ;
-                    newX = Mathf.Clamp(newX, 0, width - 1);
-                    newZ = Mathf.Clamp(newZ, 0, height - 1);
+                    //int newX = j + (int)terrainX - brushSize;
+                    //int newZ = i + (int)terrainZ - brushSize;
+                    //newX = Mathf.Clamp(newX, 0, width - 1);
+                    //newZ = Mathf.Clamp(newZ, 0, height - 1);
 
                     // Loop through the neighboring vertices within the brush area
                     for (int offsetX = -1; offsetX <= 1; offsetX++)
                     {
                         for (int offsetZ = -1; offsetZ <= 1; offsetZ++)
                         {
-                            int neighborX = Mathf.Clamp(newX + offsetX, 0, width - 1);
-                            int neighborZ = Mathf.Clamp(newZ + offsetZ, 0, height - 1);
+                            int neighborX = Mathf.Clamp(i + offsetX, 0, endX-startX-1);
+                            int neighborZ = Mathf.Clamp(j + offsetZ, 0, endZ-startZ-1);
 
-                            averageHeight += heights[neighborZ, neighborX];
+                            averageHeight += heights[neighborX, neighborZ];
                             count++;
                         }
                     }
 
                     // Calculate the smoothed height
                     averageHeight /= count;
-                    heights[newZ, newX] = Mathf.Lerp(heights[newZ, newX], averageHeight, strength * Time.deltaTime * strengthMutliplierSmooth);
+                    heights[i, j] = Mathf.Lerp(heights[i, j], averageHeight, strength * Time.deltaTime * strengthMutliplierSmooth);
                 }
-                
             }
         }
-        
-
-        //Apply the modified heights back to the terrain
-        terrain.terrainData.SetHeights(0, 0, heights);
+        terrain.terrainData.SetHeights(startX, startZ, heights);
     }
     bool GetInfoTerrain()
     {
@@ -407,7 +498,14 @@ public class TerrainEditor : MonoBehaviour
 
             // Get the corresponding height on the terrain
             terrainY = terrain.transform.InverseTransformPoint(hit.point).y / terrainHeight;
-            heights = terrain.terrainData.GetHeights(0, 0, width, height);
+
+
+            // Only get the portion of the alpha map affected by the brush
+            startX = Mathf.Clamp(terrainX - brushSize, 0, width - 1);
+            startZ = Mathf.Clamp(terrainZ - brushSize, 0, height - 1);
+            endX = Mathf.Clamp(terrainX + brushSize, 0, width - 1);
+            endZ = Mathf.Clamp(terrainZ + brushSize, 0, height - 1);
+            heights = terrain.terrainData.GetHeights(startX, startZ, endX - startX, endZ - startZ);
 
             strength = menuTerrainInfo.GetStrenght();
             mode = menuTerrainInfo.GetMode();
@@ -419,62 +517,46 @@ public class TerrainEditor : MonoBehaviour
         }
         return false;
     }
-    void ModifyTerrain()
-    {        
-        if (scaleUp)
-        {
-            heights[(int)terrainZ, (int)terrainX] += strength * Time.deltaTime;
-        }
-        else
-        {
-            heights[(int)terrainZ, (int)terrainX] -= strength * Time.deltaTime;
-        }
-        RaiseTerrain(heights, brushSize, (int)terrainZ, (int)terrainX, heights[(int)terrainZ, (int)terrainX], terrain);
-        terrain.terrainData.SetHeights(0, 0, heights);
-    }
 	// Smoothly raise terrain to target height at given point 
-	void RaiseTerrain(float[,] heightMap, int radius, int centreX, int centreY, float tergetHeight,Terrain terrain)
+	void RaiseTerrain()
 	{
-        int sqrRadius = radius * radius;
-		// Loop over brush bounding box 
-		for (int offsetY = -radius; offsetY <= radius; offsetY++)
-		{
-                for (int offsetX = -radius; offsetX <= radius; offsetX++)
+        int localTerrainX = terrainX - startX;
+        int localTerrainZ = terrainZ - startZ;
+        int sqrRadius = brushSize * brushSize;
+
+        for (int i = 0; i < endZ - startZ; i++)
+        {
+            for (int j = 0; j < endX - startX; j++)
+            {
+                int sqrDstFromCentre = (j - localTerrainX) * (j - localTerrainX) + (i - localTerrainZ) * (i - localTerrainZ);
+
+                if (sqrDstFromCentre <= sqrRadius)
                 {
-                    int sqrDstFromCentre = offsetX * offsetX + offsetY * offsetY;
-                    // Check i f point is inside brush radius 
-                    if (sqrDstFromCentre <= sqrRadius)
+                    // Cal culate brush weight with exponential falloff from centre 
+                    float dstFromCentre = Mathf.Sqrt(sqrDstFromCentre);
+                    float t = dstFromCentre / brushSize;
+                    float brushWeight = Mathf.Exp(-t * t / brushFallOff);
+                    brushWeight = Mathf.Exp(-t * blendCurve.Evaluate(t));
+
+                    if (scaleUp)
                     {
-                        // Cal culate brush weight with exponential falloff from centre 
-                        float dstFromCentre = Mathf.Sqrt(sqrDstFromCentre);
-                        float t = dstFromCentre / radius;
-                        float brushWeight = Mathf.Exp(-t * t / brushFallOff);
-                        brushWeight = Mathf.Exp(-t * blendCurve.Evaluate(t));
-
-                        // Rai se terrain 
-                        int brushX = centreX + offsetX;
-                        int brushY = centreY + offsetY;
-
-                        if (brushX >= 0 && brushY >= 0 && brushX < width && brushY < height)
-                        {
-                        if (scaleUp)
-                        {
-                            heightMap[brushX, brushY] += strength * Time.deltaTime;
-                        }
-                        else
-                        {
-                            if (minHeightController < heightMap[brushX, brushY] - strength * Time.deltaTime)
-                            {
-                                heightMap[brushX, brushY] -= strength * Time.deltaTime;
-                            }
-                            else
-                            {
-                                heightMap[brushX, brushY] = minHeightController;
-                            }
-                        }
-                        }
+                        heights[i, j] += strength * Time.deltaTime;
                     }
-                }           
-		}
-	}
+                    else
+                    {
+                        heights[i, j] -= strength * Time.deltaTime;
+                        //if (minHeightController < heightMap[brushX, brushY] - strength * Time.deltaTime)
+                        //{
+                        //    heightMap[brushX, brushY] -= strength * Time.deltaTime;
+                        //}
+                        //else
+                        //{
+                        //    heightMap[brushX, brushY] = minHeightController;
+                        //}
+                    }
+                }
+            }
+        }
+        terrain.terrainData.SetHeights(startX, startZ, heights);      
+    }
 }

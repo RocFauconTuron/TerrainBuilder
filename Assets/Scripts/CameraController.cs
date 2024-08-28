@@ -119,7 +119,6 @@ public class CameraController : MonoBehaviour
                 lastMousePosition = Input.mousePosition;
 
                 Vector3 moveDir = targetRotate.forward * -inputDir.z + targetRotate.right * -inputDir.x;
-                Debug.Log(moveDir);
 
                 targetRotate.position += moveDir * moveSpeedDrag * Time.deltaTime;
                 targetRotate.position = new Vector3(targetRotate.position.x, 0, targetRotate.position.z);
